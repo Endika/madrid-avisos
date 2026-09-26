@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "madrid-avisos"
-version = "0.1.0"
+version = "0.0.0"
 description = "Da un empujón diario a los avisos de limpieza de tus calles en avisos.madrid.es"
 readme = "README.md"
 license = "MIT"
