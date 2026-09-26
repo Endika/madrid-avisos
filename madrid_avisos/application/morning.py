@@ -76,9 +76,9 @@ def _push_streets(
 def _decide(
     portal: Portal, street: str, state: Mapping[str, str], avisos: Sequence[Aviso]
 ) -> policy.Decision:
-    token = policy.unlisted(street, state, avisos)
-    looked_up = portal.lookup(token) if token else None
-    return policy.decide(street, state, avisos, looked_up)
+    token = state.get(street)
+    tracked = (policy.find(avisos, token) or portal.lookup(token)) if token else None
+    return policy.decide(street, tracked, state, avisos)
 
 
 def _carry_out(

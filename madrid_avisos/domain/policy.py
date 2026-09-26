@@ -1,4 +1,4 @@
-"""Which aviso each street pushes this morning, or whether it needs a new one."""
+"""Which aviso each street pushes, or whether it needs a new one."""
 
 from __future__ import annotations
 
@@ -26,23 +26,14 @@ def street_name(address: str) -> str:
     return address.split(",", 1)[0].strip().casefold()
 
 
-def unlisted(street: str, state: Mapping[str, str], avisos: Sequence[Aviso]) -> str | None:
-    """The street's tracked token when the list of my avisos no longer shows it."""
-    token = state.get(street)
-    if token and all(a.token != token for a in avisos):
-        return token
-    return None
+def find(avisos: Sequence[Aviso], token: str) -> Aviso | None:
+    return next((a for a in avisos if a.token == token), None)
 
 
 def decide(
-    street: str,
-    state: Mapping[str, str],
-    avisos: Sequence[Aviso],
-    looked_up: Aviso | None = None,
+    street: str, tracked: Aviso | None, state: Mapping[str, str], avisos: Sequence[Aviso]
 ) -> Decision:
-    """`looked_up` is what the portal said about the `unlisted` token, if it still has it."""
-    token = state.get(street)
-    tracked = next((a for a in avisos if a.token == token), looked_up) if token else None
+    """`tracked` is the aviso `state` holds for `street`, or None if the portal lost it."""
     if tracked and tracked.is_open:
         return CommentOn(tracked)
     taken = {t for other, t in state.items() if other != street}
