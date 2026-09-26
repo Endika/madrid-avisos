@@ -250,3 +250,17 @@ def test_every_morning_after_the_first_comments_again_and_opens_nothing(home, ma
     assert [c["description"] for c in comments] == ["Sigue sucia."] * 3
     assert {c["token"] for c in comments} == {a["token"] for a in madrid.avisos}
     assert not madrid.posted("/requests")
+
+
+def test_dry_run_names_the_closed_aviso_it_would_replace(home, madrid, capsys):
+    aviso = madrid.add(PEZ)
+    tick(home, madrid)
+    aviso["status_node_type"] = "final_ok_node"
+    aviso["status_node"] = {"visible_name": "Resuelto"}
+    capsys.readouterr()
+
+    tick(home, madrid, "--dry-run")
+
+    number = aviso["service_request_id"]
+    out = capsys.readouterr().out
+    assert f"{PEZ}: aviso nuevo, el anterior #{number} se cerró: Resuelto; simulado" in out

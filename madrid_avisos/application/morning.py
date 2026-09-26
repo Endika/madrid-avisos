@@ -97,7 +97,7 @@ def _carry_out(
         return Outcome(street, Action.COMMENTED, decision.aviso, decision.closed, simulated=dry_run)
     place = portal.locate(street)
     if dry_run:
-        return Outcome(street, Action.CREATED, simulated=True)
+        return Outcome(street, Action.CREATED, closed=decision.closed, simulated=True)
     aviso = portal.create(
         place,
         problem=complaint.problem,
