@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .config import Config
-from .domain import Aviso, Place
+from .domain import Aviso, Place, policy
 from .portal import PortalError
 
 log = logging.getLogger(__name__)
@@ -34,10 +34,6 @@ class Outcome:
     note: str = ""
 
 
-def _street_name(address: str) -> str:
-    return address.split(",", 1)[0].strip().casefold()
-
-
 def load_state(path: Path) -> dict[str, str]:
     try:
         raw = json.loads(path.read_text())
@@ -52,27 +48,18 @@ def save_state(path: Path, state: dict[str, str]) -> None:
     tmp.replace(path)
 
 
-def _pick(
-    portal: Portal, street: str, known: str | None, avisos: list[Aviso], taken: set[str]
-) -> tuple[Aviso | None, Aviso | None]:
-    """(open aviso to push, the tracked one if it has closed since)."""
-    tracked = next((a for a in avisos if a.token == known), None) if known else None
-    if known and tracked is None:
+def _decide(
+    portal: Portal, street: str, state: dict[str, str], avisos: list[Aviso]
+) -> policy.Decision:
+    looked_up = None
+    token = policy.unlisted(street, state, avisos)
+    if token:
         try:
-            tracked = portal.aviso(known)
+            looked_up = portal.aviso(token)
         except PortalError as exc:
             if exc.status != 404:
                 raise
-    if tracked and tracked.is_open:
-        return tracked, None
-    # Nothing tracked yet, or it closed: adopt my newest open aviso on the same street, if any.
-    same_street = [
-        a
-        for a in avisos
-        if a.is_open and a.token not in taken and _street_name(a.address) == _street_name(street)
-    ]
-    same_street.sort(key=lambda a: a.requested, reverse=True)
-    return (same_street[0] if same_street else None), tracked
+    return policy.decide(street, state, avisos, looked_up)
 
 
 def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool) -> list[Outcome]:
@@ -80,9 +67,10 @@ def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool)
     informant = portal.profile()
     outcomes: list[Outcome] = []
     for street in config.streets:
-        taken = {token for other, token in state.items() if other != street}
         try:
-            target, closed = _pick(portal, street, state.get(street), avisos, taken)
+            decision = _decide(portal, street, state, avisos)
+            target = decision.aviso if isinstance(decision, policy.CommentOn) else None
+            closed = decision.closed
             note = f"el anterior #{closed.number} se cerró: {closed.status_name}" if closed else ""
             if target is None:
                 if dry_run:
