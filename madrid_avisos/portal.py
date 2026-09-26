@@ -36,7 +36,6 @@ class Aviso:
     address: str
     status_type: str
     status_name: str
-    supporting: bool
     requested: str
 
     @property
@@ -52,7 +51,6 @@ class Aviso:
             address=str(raw.get("address") or raw.get("address_string") or ""),
             status_type=str(raw.get("status_node_type") or ""),
             status_name=str(node.get("visible_name") or node.get("name") or ""),
-            supporting=bool(raw.get("supporting")),
             requested=str(raw.get("requested_datetime") or ""),
         )
 
@@ -231,17 +229,8 @@ class Portal:
                 address=place.address,
                 status_type="initial_node",
                 status_name="",
-                supporting=False,
                 requested="",
             )
-
-    def reiterate(self, aviso: Aviso, description: str) -> None:
-        self._call(
-            "reiterate",
-            "POST",
-            f"/request/{aviso.token}/reiteration",
-            payload={"description": description, "source": WEB_CHANNEL, "follow_request": "true"},
-        )
 
     def comment(self, aviso: Aviso, description: str) -> None:
         self._call(

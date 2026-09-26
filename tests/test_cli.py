@@ -66,15 +66,9 @@ def test_first_morning_adopts_open_avisos_on_the_same_street_and_opens_the_rest(
         {"question": "q-cp", "value": 28001},
     ]
     assert (created["first_name"], created["email"]) == ("Ana", "me@example.org")
-    assert madrid.posted(f"/request/{pez['token']}/reiteration") == [
-        {
-            "description": "Sigue sucia.",
-            "source": "5922d3a24e4ea82f178b4567",
-            "follow_request": "true",
-        }
-    ]
-    assert madrid.posted(f"/request/{new_toledo['token']}/reiteration")
-    assert not madrid.posted(f"/request/{old_toledo['token']}/reiteration")
+    comments = {c["token"]: c["description"] for c in madrid.posted("/requests_comments")}
+    assert comments == {pez["token"]: "Sigue sucia.", new_toledo["token"]: "Sigue sucia."}
+    assert old_toledo["token"] not in comments
     assert state(home) == {
         MAYOR: madrid.avisos[-1]["token"],
         PEZ: pez["token"],
@@ -82,33 +76,7 @@ def test_first_morning_adopts_open_avisos_on_the_same_street_and_opens_the_rest(
     }
     text = slack_text(madrid)
     assert f"{MAYOR}: aviso nuevo #{madrid.avisos[-1]['service_request_id']}" in text
-    assert f"{PEZ}: reiterado #{pez['service_request_id']} (Asignado)" in text
-
-
-def test_once_reiterated_the_next_mornings_comment(home, madrid):
-    for street in (MAYOR, PEZ, TOLEDO):
-        madrid.add(street)
-    tick(home, madrid)
-    madrid.calls.clear()
-
-    assert tick(home, madrid) == 0
-
-    comments = madrid.posted("/requests_comments")
-    assert [c["description"] for c in comments] == ["Sigue sucia."] * 3
-    assert {c["token"] for c in comments} == {a["token"] for a in madrid.avisos}
-    assert not madrid.posted("/requests")
-    assert slack_text(madrid).count("comentado") == 3
-
-
-def test_a_refused_reiteration_falls_back_to_a_comment_and_says_so(home, madrid):
-    aviso = madrid.add(PEZ)
-    madrid.refuse_own_reiteration = True
-
-    assert tick(home, madrid) == 0
-
-    assert madrid.posted("/requests_comments")[0]["token"] == aviso["token"]
-    assert "comentado" in slack_text(madrid)
-    assert "reiterar rechazado" in slack_text(madrid)
+    assert f"{PEZ}: comentado #{pez['service_request_id']} (Asignado)" in text
 
 
 def test_a_closed_aviso_is_replaced_and_its_closing_reported(home, madrid):
@@ -135,7 +103,7 @@ def test_a_refused_creation_fails_loudly_without_stopping_the_other_streets(home
     text = slack_text(madrid)
     assert f"{MAYOR}: ERROR" in text
     assert "HTTP 429" in text
-    assert f"{PEZ}: reiterado" in text
+    assert f"{PEZ}: comentado" in text
     assert MAYOR not in state(home)
 
 
@@ -185,19 +153,9 @@ def test_a_slack_refusal_keeps_the_state_but_exits_non_zero(home, madrid):
     assert (home / "state.json").exists()
 
 
-def test_a_server_error_on_reiteration_fails_the_street_instead_of_commenting(home, madrid):
-    madrid.add(PEZ)
-    madrid.reiteration_status = 503
-
-    assert tick(home, madrid) == 1
-
-    assert not madrid.posted("/requests_comments")
-    assert f"{PEZ}: ERROR" in slack_text(madrid)
-
-
 def test_a_network_failure_mid_run_still_reaches_slack(home, madrid):
     madrid.add(PEZ)
-    madrid.network_down_on = "/request/"
+    madrid.network_down_on = "/requests_comments"
 
     assert tick(home, madrid) == 1
 
@@ -261,7 +219,7 @@ def test_a_tracked_aviso_off_the_list_is_looked_up_before_opening_another(home, 
     tick(home, madrid)
 
     assert PEZ not in [c["address_string"] for c in madrid.posted("/requests")]
-    assert madrid.posted("/requests_comments")[0]["token"] == aviso["token"]
+    assert aviso["token"] in [c["token"] for c in madrid.posted("/requests_comments")]
 
 
 def test_creation_accepts_any_2xx(home, madrid):
@@ -278,3 +236,17 @@ def test_an_unreachable_slack_does_not_crash_but_exits_non_zero(home, madrid):
     assert tick(home, madrid) == 1
 
     assert (home / "state.json").exists()
+
+
+def test_every_morning_after_the_first_comments_again_and_opens_nothing(home, madrid):
+    for street in (MAYOR, PEZ, TOLEDO):
+        madrid.add(street)
+    tick(home, madrid)
+    madrid.calls.clear()
+
+    assert tick(home, madrid) == 0
+
+    comments = madrid.posted("/requests_comments")
+    assert [c["description"] for c in comments] == ["Sigue sucia."] * 3
+    assert {c["token"] for c in comments} == {a["token"] for a in madrid.avisos}
+    assert not madrid.posted("/requests")

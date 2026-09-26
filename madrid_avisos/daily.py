@@ -1,4 +1,4 @@
-"""One morning: every street gets pushed once, by reiterating, commenting or opening an aviso."""
+"""One morning: every street gets pushed once, by commenting on its aviso or opening one."""
 
 from __future__ import annotations
 
@@ -22,14 +22,13 @@ class Portal(Protocol):
     def create(
         self, place: Place, *, problem: str, description: str, informant: dict[str, object]
     ) -> Aviso: ...
-    def reiterate(self, aviso: Aviso, description: str) -> None: ...
     def comment(self, aviso: Aviso, description: str) -> None: ...
 
 
 @dataclass(frozen=True)
 class Outcome:
     street: str
-    action: str  # created, reiterated, commented, failed
+    action: str  # created, commented, failed
     aviso: Aviso | None = None
     note: str = ""
 
@@ -75,24 +74,6 @@ def _pick(
     return (same_street[0] if same_street else None), tracked
 
 
-def _push(portal: Portal, aviso: Aviso, text: str, dry_run: bool) -> tuple[str, str]:
-    if dry_run:
-        return ("commented" if aviso.supporting else "reiterated"), "simulado"
-    if not aviso.supporting:
-        try:
-            portal.reiterate(aviso, text)
-            return "reiterated", ""
-        except PortalError as exc:
-            # Only a real refusal (4xx) earns the fallback; a network blip or a 5xx is a failure.
-            if not 400 <= exc.status < 500 or exc.status == 429:
-                raise
-            log.info("reiteration refused for %s (%s); commenting instead", aviso.number, exc)
-            portal.comment(aviso, text)
-            return "commented", f"reiterar rechazado: {exc}"
-    portal.comment(aviso, text)
-    return "commented", ""
-
-
 def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool) -> list[Outcome]:
     avisos = portal.my_avisos()
     informant = portal.profile()
@@ -115,7 +96,10 @@ def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool)
                 )
                 action, extra = "created", ""
             else:
-                action, extra = _push(portal, target, config.followup, dry_run)
+                # The portal refuses to let the informant reiterate (403), so a comment it is.
+                if not dry_run:
+                    portal.comment(target, config.followup)
+                action, extra = "commented", "simulado" if dry_run else ""
             state[street] = target.token
             outcomes.append(
                 Outcome(street, action, target, "; ".join(n for n in (note, extra) if n))
@@ -128,7 +112,6 @@ def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool)
 
 VERBS = {
     "created": "aviso nuevo",
-    "reiterated": "reiterado",
     "commented": "comentado",
     "failed": "ERROR",
 }

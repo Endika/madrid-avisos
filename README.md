@@ -5,12 +5,13 @@ Every morning, pushes the street-cleaning avisos of your streets on
 
 For each street in the config:
 
-- **Its aviso is open** → it reiterates it. Once reiterated (or if the portal refuses to
-  reiterate your own aviso), it adds a comment instead.
+- **Its aviso is open** → it adds a comment to it. Reiterating is not an option: the portal
+  answers `403 … is the informant` when you try it on your own aviso.
 - **It has none, or the last one was closed** → it opens a new one, and the summary says how
   the old one was closed.
 
-It only uses the standard library, so it runs on a stock `python3` ≥ 3.11 (a Raspberry Pi).
+On the first run it adopts your newest open aviso on the same street, if you already have
+one. It only uses the standard library, so it runs on a stock `python3` ≥ 3.11 (a Raspberry Pi).
 
 ## Setup
 

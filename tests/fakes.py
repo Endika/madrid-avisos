@@ -20,10 +20,8 @@ class FakeMadrid:
     password: str = "s3cret"
     avisos: list[dict[str, Any]] = field(default_factory=list)
     places: dict[str, dict[str, Any]] = field(default_factory=dict)
-    refuse_own_reiteration: bool = False
     create_status: int = 200
     create_ok_status: int = 200
-    reiteration_status: int = 200
     slack_ok: bool = True
     network_down_on: str = ""
     html_on: str = ""
@@ -38,7 +36,6 @@ class FakeMadrid:
         address: str,
         *,
         status: str = "initial_node",
-        supporting: bool = False,
         requested: str = "2026-09-26T10:00:00+00:00",
     ) -> dict[str, Any]:
         self._next += 1
@@ -48,7 +45,6 @@ class FakeMadrid:
             "address": address,
             "status_node_type": status,
             "status_node": {"visible_name": "Asignado" if status == "initial_node" else "Cerrado"},
-            "supporting": supporting,
             "requested_datetime": requested,
         }
         self.avisos.append(aviso)
@@ -131,14 +127,6 @@ class FakeMadrid:
                 self.hidden.add(aviso["token"])
             made = {"token": aviso["token"], "service_request_id": aviso["service_request_id"]}
             return _json([made], self.create_ok_status)
-        if m := re.fullmatch(r"/request/(\w+)/reiteration", path):
-            aviso = next(a for a in self.avisos if a["token"] == m[1])
-            if self.refuse_own_reiteration:
-                return _json([{"code": 400, "description": "own request"}], 400)
-            if self.reiteration_status != 200:
-                return _json([{"code": 0, "description": "down"}], self.reiteration_status)
-            aviso["supporting"] = True
-            return _json({"ok": True})
         if (method, path) == ("POST", "/requests_comments"):
             return _json([{"id": "c1"}])
         return _json([{"code": 404, "description": f"no route {method} {path}"}], 404)
