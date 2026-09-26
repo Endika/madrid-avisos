@@ -44,3 +44,12 @@ class Portal(Protocol):
 
 class Notifier(Protocol):
     def send(self, text: str) -> bool: ...
+
+
+class StateStore(Protocol):
+    """Which aviso each street is pushing, kept from one morning to the next."""
+
+    def load(self) -> dict[str, str]: ...
+
+    # Raises OSError when it cannot write; the morning reports it instead of crashing.
+    def save(self, state: Mapping[str, str]) -> None: ...

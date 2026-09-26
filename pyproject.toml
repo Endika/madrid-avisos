@@ -23,6 +23,9 @@ packages = [
     "madrid_avisos.adapters",
     "madrid_avisos.adapters.notify",
     "madrid_avisos.adapters.portal",
+    "madrid_avisos.adapters.state",
+    "madrid_avisos.application",
+    "madrid_avisos.cli",
     "madrid_avisos.domain",
     "madrid_avisos.ports",
 ]
