@@ -5,10 +5,12 @@ import logging
 import sys
 from pathlib import Path
 
-from . import daily, slack
+from . import daily
+from .adapters.http import UrllibTransport
+from .adapters.notify import Slack
+from .adapters.portal import PortalClient
 from .config import ConfigError, load, read_credentials
-from .http import Transport, UrllibTransport
-from .portal import Portal
+from .ports import Transport
 
 log = logging.getLogger("madrid_avisos")
 
@@ -28,10 +30,10 @@ def main(argv: list[str] | None = None, transport: Transport | None = None) -> i
         return 2
 
     http = transport or UrllibTransport()
-    portal = Portal(http)
+    portal = PortalClient(http, email, password)
     try:
         state = daily.load_state(config.state)
-        portal.login(email, password)
+        portal.login()
         outcomes = daily.run(portal, config, state, dry_run=args.dry_run)
     except Exception as exc:
         log.exception("run aborted")
@@ -52,7 +54,7 @@ def main(argv: list[str] | None = None, transport: Transport | None = None) -> i
 
     print(text)
     if not args.dry_run and config.slack_token and config.slack_channel:
-        ok = slack.send(http, config.slack_token, config.slack_channel, text) and ok
+        ok = Slack(http, config.slack_token, config.slack_channel).send(text) and ok
     return 0 if ok else 1
 
 

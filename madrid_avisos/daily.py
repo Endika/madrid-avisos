@@ -6,24 +6,12 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
 from .config import Config
-from .domain import Aviso, Place, policy
-from .portal import PortalError
+from .domain import Aviso, policy
+from .ports import Portal
 
 log = logging.getLogger(__name__)
-
-
-class Portal(Protocol):
-    def profile(self) -> dict[str, object]: ...
-    def my_avisos(self) -> list[Aviso]: ...
-    def aviso(self, token: str) -> Aviso: ...
-    def locate(self, address: str) -> Place: ...
-    def create(
-        self, place: Place, *, problem: str, description: str, informant: dict[str, object]
-    ) -> Aviso: ...
-    def comment(self, aviso: Aviso, description: str) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -51,20 +39,14 @@ def save_state(path: Path, state: dict[str, str]) -> None:
 def _decide(
     portal: Portal, street: str, state: dict[str, str], avisos: list[Aviso]
 ) -> policy.Decision:
-    looked_up = None
     token = policy.unlisted(street, state, avisos)
-    if token:
-        try:
-            looked_up = portal.aviso(token)
-        except PortalError as exc:
-            if exc.status != 404:
-                raise
+    looked_up = portal.lookup(token) if token else None
     return policy.decide(street, state, avisos, looked_up)
 
 
 def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool) -> list[Outcome]:
     avisos = portal.my_avisos()
-    informant = portal.profile()
+    informant = portal.informant()
     outcomes: list[Outcome] = []
     for street in config.streets:
         try:

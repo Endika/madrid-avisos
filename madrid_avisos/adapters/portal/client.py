@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import secrets
 import urllib.parse
+from collections.abc import Mapping
 from typing import Any
 
-from .domain import Aviso, Place
-from .http import Response, Transport
+from ...domain import Aviso, Place
+from ...ports import Transport
+from .parsing import aviso_from_api, error_detail, exact_match, login_token, place_from
 
 API = "https://servpub.madrid.es/AVSICAPI"
 LOGIN = f"{API}/microservice/login-cid360?origin=SIC"
@@ -29,35 +31,15 @@ class PortalError(Exception):
         self.status = status
 
 
-def _aviso(raw: dict[str, Any]) -> Aviso:
-    node = raw.get("status_node") or {}
-    return Aviso(
-        token=str(raw["token"]),
-        number=str(raw.get("service_request_id", "")),
-        address=str(raw.get("address") or raw.get("address_string") or ""),
-        status_type=str(raw.get("status_node_type") or ""),
-        status_name=str(node.get("visible_name") or node.get("name") or ""),
-        requested=str(raw.get("requested_datetime") or ""),
-    )
-
-
-def _detail(res: Response) -> str:
-    try:
-        payload = json.loads(res.body)
-    except ValueError:
-        return res.text()[:200]
-    if isinstance(payload, list) and payload and isinstance(payload[0], dict):
-        return str(payload[0].get("description") or payload[0])
-    return str(payload)[:200]
-
-
-class Portal:
-    def __init__(self, transport: Transport) -> None:
+class PortalClient:
+    def __init__(self, transport: Transport, email: str, password: str) -> None:
         self._http = transport
+        self._email = email
+        self._password = password
         self._token = ""
 
-    def login(self, email: str, password: str) -> None:
-        form = urllib.parse.urlencode({"user_mail": email, "password": password}).encode()
+    def login(self) -> None:
+        form = urllib.parse.urlencode({"user_mail": self._email, "password": self._password})
         try:
             self._http.request("GET", LOGIN, headers={"User-Agent": USER_AGENT})
             res = self._http.request(
@@ -67,14 +49,12 @@ class Portal:
                     "User-Agent": USER_AGENT,
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-                body=form,
+                body=form.encode(),
             )
         except OSError as exc:
             raise PortalError("login", 0, f"network: {exc}") from exc
-        location = res.headers.get("Location") or res.headers.get("location") or ""
-        query = urllib.parse.parse_qs(urllib.parse.urlsplit(location).query)
-        token = query.get("token", [""])[0]
-        if res.status not in (301, 302, 303) or not token:
+        token = login_token(res)
+        if not token:
             raise PortalError("login", res.status, "no token; wrong email or password?")
         self._token = token
 
@@ -110,17 +90,17 @@ class Portal:
         except OSError as exc:
             raise PortalError(what, 0, f"network: {exc}") from exc
         if not 200 <= res.status < 300:
-            raise PortalError(what, res.status, _detail(res))
+            raise PortalError(what, res.status, error_detail(res))
         try:
             return json.loads(res.body) if res.body else None
         except ValueError as exc:
             raise PortalError(what, res.status, f"not JSON: {res.text()[:120]!r}") from exc
 
-    def profile(self) -> dict[str, Any]:
+    def informant(self) -> dict[str, Any]:
         me = self._call("profile", "GET", "/me")
         if not isinstance(me, dict):
             raise PortalError("profile", 200, "unexpected shape")
-        return me
+        return {k: me[k] for k in INFORMANT_FIELDS if me.get(k)}
 
     def my_avisos(self) -> list[Aviso]:
         raw = self._call(
@@ -136,46 +116,36 @@ class Portal:
         )
         if not isinstance(raw, list) or not all(isinstance(r, dict) and "token" in r for r in raw):
             raise PortalError("my avisos", 200, "unexpected shape")
-        return [_aviso(r) for r in raw]
+        return [aviso_from_api(r) for r in raw]
 
-    def aviso(self, token: str) -> Aviso:
-        raw = self._call("aviso", "GET", f"/requests/{token}")
+    def lookup(self, token: str) -> Aviso | None:
+        try:
+            raw = self._call("aviso", "GET", f"/requests/{token}")
+        except PortalError as exc:
+            if exc.status == 404:
+                return None
+            raise
         found = raw[0] if isinstance(raw, list) and raw else raw
         if not isinstance(found, dict) or "token" not in found:
-            raise PortalError("aviso", 404, f"{token} not found")
-        return _aviso(found)
+            return None
+        return aviso_from_api(found)
 
     def locate(self, address: str) -> Place:
+        what = f"locate {address!r}"
         raw = self._call(
-            f"locate {address!r}",
+            what,
             "GET",
             "/location-additional-data",
             params={"jurisdiction_element_id": JURISDICTION_ELEMENT, "formatted_address": address},
         )
-        exact = [
-            p
-            for p in raw or []
-            if str(p.get("formatted_address", "")).casefold() == address.casefold()
-            and p.get("location")
-        ]
-        if len(exact) != 1:
+        hit = exact_match(address, raw)
+        if hit is None:
             found = [p.get("formatted_address") for p in raw or []]
-            raise PortalError(f"locate {address!r}", 200, f"no single exact match: {found}")
-        hit = exact[0]
-        data = tuple(
-            (str(d["question"]["id"]), d["value"])
-            for d in hit.get("data", [])
-            if d.get("value") is not None and str(d["value"]).strip()
-        )
-        return Place(
-            address=str(hit["formatted_address"]),
-            lat=float(hit["location"]["lat"]),
-            lng=float(hit["location"]["lng"]),
-            data=data,
-        )
+            raise PortalError(what, 200, f"no single exact match: {found}")
+        return place_from(hit)
 
     def create(
-        self, place: Place, *, problem: str, description: str, informant: dict[str, Any]
+        self, place: Place, *, problem: str, description: str, informant: Mapping[str, object]
     ) -> Aviso:
         body: dict[str, Any] = {
             "service_id": STREET_CLEANING,
@@ -190,7 +160,7 @@ class Portal:
             "device_type": WEB_CHANNEL,
             "jurisdiction_id": JURISDICTION,
         }
-        body |= {k: informant[k] for k in INFORMANT_FIELDS if informant.get(k)}
+        body |= informant
         raw = self._call(
             "create", "POST", "/requests", params={"jurisdiction_id": JURISDICTION}, payload=body
         )
@@ -198,29 +168,30 @@ class Portal:
         if not isinstance(made, dict) or "token" not in made:
             raise PortalError("create", 200, f"no token in {str(raw)[:120]}")
         try:
-            return self.aviso(str(made["token"]))
+            created = self.lookup(str(made["token"]))
         except PortalError:
-            # It exists; it just is not readable yet. Track it anyway so tomorrow pushes it.
-            return Aviso(
-                token=str(made["token"]),
-                number=str(made.get("service_request_id", "")),
-                address=place.address,
-                status_type="initial_node",
-                status_name="",
-                requested="",
-            )
+            created = None
+        # It exists even when it is not readable yet. Track it anyway so tomorrow pushes it.
+        return created or Aviso(
+            token=str(made["token"]),
+            number=str(made.get("service_request_id", "")),
+            address=place.address,
+            status_type="initial_node",
+            status_name="",
+            requested="",
+        )
 
-    def comment(self, aviso: Aviso, description: str) -> None:
+    def comment(self, aviso: Aviso, text: str) -> None:
         self._call(
             "comment",
             "POST",
             "/requests_comments",
             params={"jurisdiction_id": JURISDICTION},
-            form=_multipart({"description": description, "token": aviso.token}),
+            form=encode_multipart({"description": text, "token": aviso.token}),
         )
 
 
-def _multipart(fields: dict[str, str]) -> tuple[bytes, str]:
+def encode_multipart(fields: dict[str, str]) -> tuple[bytes, str]:
     boundary = f"----madrid-avisos-{secrets.token_hex(8)}"
     parts = [
         f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'

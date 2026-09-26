@@ -8,8 +8,8 @@ import urllib.parse
 from dataclasses import dataclass, field
 from typing import Any
 
-from madrid_avisos.http import Response
-from madrid_avisos.portal import API, LOGIN
+from madrid_avisos.adapters.portal.client import API, LOGIN
+from madrid_avisos.ports import Response
 
 TOKEN = "jwt-abc"
 
