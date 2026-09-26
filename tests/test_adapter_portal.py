@@ -143,3 +143,11 @@ def test_a_wrong_password_says_so():
 
     with pytest.raises(PortalError, match="wrong email or password"):
         portal.login()
+
+
+def test_a_broken_profile_is_reported_as_the_informant():
+    portal = PortalClient(FakeMadrid(html_on="/me"), "me@example.org", "s3cret")
+    portal.login()
+
+    with pytest.raises(PortalError, match=r"^informant: HTTP 200 not JSON"):
+        portal.informant()

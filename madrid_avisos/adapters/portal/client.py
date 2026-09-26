@@ -97,9 +97,9 @@ class PortalClient:
             raise PortalError(what, res.status, f"not JSON: {res.text()[:120]!r}") from exc
 
     def informant(self) -> dict[str, Any]:
-        me = self._call("profile", "GET", "/me")
+        me = self._call("informant", "GET", "/me")
         if not isinstance(me, dict):
-            raise PortalError("profile", 200, "unexpected shape")
+            raise PortalError("informant", 200, "unexpected shape")
         return {k: me[k] for k in INFORMANT_FIELDS if me.get(k)}
 
     def my_avisos(self) -> list[Aviso]:
