@@ -1,0 +1,15 @@
+# Copy to ~/.config/madrid-avisos/config.toml. Relative paths are relative to this file.
+streets = [
+    "Calle Ejemplo, 1",
+]
+credentials = "credentials"  # email=... and password=..., chmod 600
+state = "state.json"
+
+[aviso]
+problem = "Suciedad"  # the answer to "¿Cuál es el problema?"
+description = "Calle llena de basura de forma continuada. Se solicita limpieza."
+followup = "La calle sigue sucia. Se solicita limpieza."
+
+[slack]
+token = "xoxb-..."
+channel = "C0123456789"
