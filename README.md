@@ -91,6 +91,21 @@ make check   # ruff, format, mypy --strict, pytest
 The tests run the real client against an in-memory version of the portal and Slack. There
 are no mocks and no network.
 
+## Layout
+
+Ports and adapters, with the decision kept away from the plumbing:
+
+```
+domain/       Aviso, Place and the policy: which aviso each street pushes, or a new one
+ports/        Portal, Notifier, StateStore and the HTTP Transport
+adapters/     portal/ (the avisos.madrid.es API), notify/ (Slack), state/ (JSON), http.py
+application/  the morning itself, and every word of the summary
+cli/          argparse and the composition root
+```
+
+The domain does no I/O, so the rules (never two streets on one aviso, adopt your newest open
+one on the same street) are tested on their own, with plain values.
+
 ## License
 
 [MIT](LICENSE)
