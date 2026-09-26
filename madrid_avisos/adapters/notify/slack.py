@@ -35,7 +35,10 @@ class Slack:
             log.error("Slack answered HTTP %s with no JSON", res.status)
             return False
         # Slack answers 200 with `ok: false` on failure, so the status code is not enough.
-        if not isinstance(payload, dict) or not payload.get("ok"):
-            log.error("Slack answered an error: %s", payload)
+        if not isinstance(payload, dict):
+            log.error("Slack answered HTTP %s with JSON that is not an object", res.status)
+            return False
+        if not payload.get("ok"):
+            log.error("Slack answered an error: %s", payload.get("error"))
             return False
         return True
