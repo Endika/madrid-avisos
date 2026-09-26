@@ -36,7 +36,7 @@ def run_morning(
         outcomes = push_streets(portal, streets, complaint, state, dry_run=dry_run)
     except Exception as exc:
         log.exception("run aborted")
-        return aborted(str(exc)), False
+        return aborted(str(exc) or type(exc).__name__), False
     text = summary(outcomes, dry_run=dry_run)
     ok = all(o.action is not Action.FAILED for o in outcomes)
     if not dry_run:

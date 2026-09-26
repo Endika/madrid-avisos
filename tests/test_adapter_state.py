@@ -44,3 +44,19 @@ def test_a_corrupt_file_is_an_error_not_a_blank_slate(tmp_path):
 
     with pytest.raises(ValueError):
         JsonStateFile(path).load()
+
+
+def test_a_state_that_is_not_an_object_is_refused(tmp_path):
+    path = tmp_path / "state.json"
+    path.write_text("[]")
+
+    with pytest.raises(ValueError, match="not a JSON object"):
+        JsonStateFile(path).load()
+
+
+def test_the_state_file_is_private(tmp_path):
+    path = tmp_path / "state.json"
+
+    JsonStateFile(path).save({"Calle Mayor, 1": "tok1"})
+
+    assert path.stat().st_mode & 0o777 == 0o600
