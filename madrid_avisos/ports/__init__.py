@@ -25,10 +25,6 @@ class Portal(Protocol):
     def comment(self, aviso: Aviso, text: str) -> None: ...
 
 
-class Notifier(Protocol):
-    def send(self, text: str) -> bool: ...
-
-
 class StateStore(Protocol):
     """Which aviso each street is pushing, kept from one morning to the next."""
 
