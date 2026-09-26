@@ -81,17 +81,20 @@ class Portal:
         self._token = ""
 
     def login(self, email: str, password: str) -> None:
-        self._http.request("GET", LOGIN, headers={"User-Agent": USER_AGENT})
         form = urllib.parse.urlencode({"user_mail": email, "password": password}).encode()
-        res = self._http.request(
-            "POST",
-            LOGIN,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body=form,
-        )
+        try:
+            self._http.request("GET", LOGIN, headers={"User-Agent": USER_AGENT})
+            res = self._http.request(
+                "POST",
+                LOGIN,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body=form,
+            )
+        except OSError as exc:
+            raise PortalError("login", 0, f"network: {exc}") from exc
         location = res.headers.get("Location") or res.headers.get("location") or ""
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(location).query)
         token = query.get("token", [""])[0]
@@ -126,10 +129,16 @@ class Portal:
             body = json.dumps(payload).encode()
         elif form is not None:
             body, headers["Content-Type"] = form
-        res = self._http.request(method, url, headers=headers, body=body)
-        if res.status != 200:
+        try:
+            res = self._http.request(method, url, headers=headers, body=body)
+        except OSError as exc:
+            raise PortalError(what, 0, f"network: {exc}") from exc
+        if not 200 <= res.status < 300:
             raise PortalError(what, res.status, _detail(res))
-        return json.loads(res.body) if res.body else None
+        try:
+            return json.loads(res.body) if res.body else None
+        except ValueError as exc:
+            raise PortalError(what, res.status, f"not JSON: {res.text()[:120]!r}") from exc
 
     def profile(self) -> dict[str, Any]:
         me = self._call("profile", "GET", "/me")
@@ -149,11 +158,16 @@ class Portal:
                 "limit": "90",
             },
         )
-        return [Aviso.from_api(r) for r in raw or []]
+        if not isinstance(raw, list) or not all(isinstance(r, dict) and "token" in r for r in raw):
+            raise PortalError("my avisos", 200, "unexpected shape")
+        return [Aviso.from_api(r) for r in raw]
 
     def aviso(self, token: str) -> Aviso:
         raw = self._call("aviso", "GET", f"/requests/{token}")
-        return Aviso.from_api(raw[0] if isinstance(raw, list) else raw)
+        found = raw[0] if isinstance(raw, list) and raw else raw
+        if not isinstance(found, dict) or "token" not in found:
+            raise PortalError("aviso", 404, f"{token} not found")
+        return Aviso.from_api(found)
 
     def locate(self, address: str) -> Place:
         raw = self._call(
@@ -204,7 +218,22 @@ class Portal:
         raw = self._call(
             "create", "POST", "/requests", params={"jurisdiction_id": JURISDICTION}, payload=body
         )
-        return self.aviso(str((raw[0] if isinstance(raw, list) else raw)["token"]))
+        made = raw[0] if isinstance(raw, list) and raw else raw
+        if not isinstance(made, dict) or "token" not in made:
+            raise PortalError("create", 200, f"no token in {str(raw)[:120]}")
+        try:
+            return self.aviso(str(made["token"]))
+        except PortalError:
+            # It exists; it just is not readable yet. Track it anyway so tomorrow pushes it.
+            return Aviso(
+                token=str(made["token"]),
+                number=str(made.get("service_request_id", "")),
+                address=place.address,
+                status_type="initial_node",
+                status_name="",
+                supporting=False,
+                requested="",
+            )
 
     def reiterate(self, aviso: Aviso, description: str) -> None:
         self._call(

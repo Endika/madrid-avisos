@@ -10,12 +10,16 @@ API = "https://slack.com/api/chat.postMessage"
 
 
 def send(transport: Transport, token: str, channel: str, text: str) -> bool:
-    res = transport.request(
-        "POST",
-        API,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        body=json.dumps({"channel": channel, "text": text}).encode(),
-    )
+    try:
+        res = transport.request(
+            "POST",
+            API,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            body=json.dumps({"channel": channel, "text": text}).encode(),
+        )
+    except OSError as exc:
+        log.error("Slack is unreachable: %s", exc)
+        return False
     try:
         payload = json.loads(res.body)
     except ValueError:

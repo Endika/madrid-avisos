@@ -177,9 +177,104 @@ def test_missing_credentials_stop_before_touching_the_network(home, madrid):
     assert madrid.calls == []
 
 
-def test_a_slack_refusal_does_not_change_the_outcome(home, madrid):
+def test_a_slack_refusal_keeps_the_state_but_exits_non_zero(home, madrid):
     madrid.slack_ok = False
 
+    assert tick(home, madrid) == 1
+
+    assert (home / "state.json").exists()
+
+
+def test_a_server_error_on_reiteration_fails_the_street_instead_of_commenting(home, madrid):
+    madrid.add(PEZ)
+    madrid.reiteration_status = 503
+
+    assert tick(home, madrid) == 1
+
+    assert not madrid.posted("/requests_comments")
+    assert f"{PEZ}: ERROR" in slack_text(madrid)
+
+
+def test_a_network_failure_mid_run_still_reaches_slack(home, madrid):
+    madrid.add(PEZ)
+    madrid.network_down_on = "/request/"
+
+    assert tick(home, madrid) == 1
+
+    text = slack_text(madrid)
+    assert f"{PEZ}: ERROR" in text
+    assert "network" in text
+    assert f"{MAYOR}: aviso nuevo" in text
+
+
+def test_a_page_that_is_not_json_is_reported_not_a_crash(home, madrid):
+    madrid.html_on = "/me"
+
+    assert tick(home, madrid) == 1
+
+    assert "not JSON" in slack_text(madrid)
+
+
+def test_a_corrupt_state_file_is_reported_before_sending_anything(home, madrid):
+    (home / "state.json").write_text("{nope")
+
+    assert tick(home, madrid) == 1
+
+    assert not madrid.posted("/requests")
+    assert "no se ha podido empezar" in slack_text(madrid)
+
+
+def test_two_addresses_on_one_street_never_share_an_aviso(home, madrid):
+    config = home / "config.toml"
+    config.write_text(config.read_text().replace(TOLEDO, "Calle del Pez, 30"))
+    madrid.place("Calle del Pez, 30")
+    tick(home, madrid)
+    first = state(home)
+    closed = next(a for a in madrid.avisos if a["token"] == first[PEZ])
+    closed["status_node_type"] = "final_ok_node"
+    madrid.calls.clear()
+
+    tick(home, madrid)
+
+    after = state(home)
+    assert after[PEZ] != after["Calle del Pez, 30"]
+    assert after["Calle del Pez, 30"] == first["Calle del Pez, 30"]
+    assert PEZ in [c["address_string"] for c in madrid.posted("/requests")]
+
+
+def test_an_aviso_created_but_not_yet_readable_is_tracked_not_failed(home, madrid):
+    madrid.hide_new = True
+
     assert tick(home, madrid) == 0
+
+    assert len(madrid.posted("/requests")) == 3
+    assert set(state(home).values()) == {a["token"] for a in madrid.avisos}
+    assert "ERROR" not in slack_text(madrid)
+
+
+def test_a_tracked_aviso_off_the_list_is_looked_up_before_opening_another(home, madrid):
+    aviso = madrid.add(PEZ)
+    tick(home, madrid)
+    madrid.unlisted.add(aviso["token"])
+    madrid.calls.clear()
+
+    tick(home, madrid)
+
+    assert PEZ not in [c["address_string"] for c in madrid.posted("/requests")]
+    assert madrid.posted("/requests_comments")[0]["token"] == aviso["token"]
+
+
+def test_creation_accepts_any_2xx(home, madrid):
+    madrid.create_ok_status = 201
+
+    assert tick(home, madrid) == 0
+
+    assert len(madrid.posted("/requests")) == 3
+
+
+def test_an_unreachable_slack_does_not_crash_but_exits_non_zero(home, madrid):
+    madrid.network_down_on = "slack"
+
+    assert tick(home, madrid) == 1
 
     assert (home / "state.json").exists()

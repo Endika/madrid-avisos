@@ -8,7 +8,7 @@ from pathlib import Path
 from . import daily, slack
 from .config import ConfigError, load, read_credentials
 from .http import Transport, UrllibTransport
-from .portal import Portal, PortalError
+from .portal import Portal
 
 log = logging.getLogger("madrid_avisos")
 
@@ -29,23 +29,30 @@ def main(argv: list[str] | None = None, transport: Transport | None = None) -> i
 
     http = transport or UrllibTransport()
     portal = Portal(http)
-    ok = True
     try:
-        portal.login(email, password)
         state = daily.load_state(config.state)
+        portal.login(email, password)
         outcomes = daily.run(portal, config, state, dry_run=args.dry_run)
-    except PortalError as exc:
-        text = f"Avisos de limpieza: no se ha podido empezar. {exc}"
+    except Exception as exc:
+        log.exception("run aborted")
+        text = f"Avisos de limpieza: no se ha podido empezar. {exc or type(exc).__name__}"
         ok = False
     else:
         text = daily.summary(outcomes, dry_run=args.dry_run)
         ok = all(o.action != "failed" for o in outcomes)
         if not args.dry_run:
-            daily.save_state(config.state, state)
+            try:
+                daily.save_state(config.state, state)
+            except OSError as exc:
+                log.error("could not save state: %s", exc)
+                text += (
+                    f"\nERROR: no se ha podido guardar el estado ({exc}); mañana puede duplicar."
+                )
+                ok = False
 
     print(text)
     if not args.dry_run and config.slack_token and config.slack_channel:
-        slack.send(http, config.slack_token, config.slack_channel, text)
+        ok = slack.send(http, config.slack_token, config.slack_channel, text) and ok
     return 0 if ok else 1
 
 

@@ -22,7 +22,14 @@ class FakeMadrid:
     places: dict[str, dict[str, Any]] = field(default_factory=dict)
     refuse_own_reiteration: bool = False
     create_status: int = 200
+    create_ok_status: int = 200
+    reiteration_status: int = 200
     slack_ok: bool = True
+    network_down_on: str = ""
+    html_on: str = ""
+    hide_new: bool = False
+    unlisted: set[str] = field(default_factory=set)
+    hidden: set[str] = field(default_factory=set)
     calls: list[tuple[str, str, Any]] = field(default_factory=list)
     _next: int = 9900000
 
@@ -68,6 +75,8 @@ class FakeMadrid:
         parts = urllib.parse.urlsplit(url)
         query = dict(urllib.parse.parse_qsl(parts.query))
         if url.startswith("https://slack.com/"):
+            if self.network_down_on == "slack":
+                raise ConnectionResetError("slack down")
             self.calls.append((method, "slack", json.loads(body or b"{}")))
             return _json({"ok": self.slack_ok, "error": None if self.slack_ok else "bad"})
         if url == LOGIN:
@@ -79,7 +88,11 @@ class FakeMadrid:
         if body is not None:
             ctype = headers.get("Content-Type", "")
             decoded = json.loads(body) if ctype == "application/json" else _form(body, ctype)
+        if self.network_down_on and path.startswith(self.network_down_on):
+            raise TimeoutError("timed out")
         self.calls.append((method, path, decoded))
+        if path == self.html_on:
+            return Response(200, b"<html>mantenimiento</html>")
         return self._route(method, path, query, decoded)
 
     def _login(self, method: str, body: bytes | None) -> Response:
@@ -95,10 +108,12 @@ class FakeMadrid:
         if (method, path) == ("GET", "/me"):
             return _json({"first_name": "Ana", "last_name": "Pi", "email": self.email})
         if (method, path) == ("GET", "/requests") and query.get("own") == "true":
-            return _json(self.avisos)
+            return _json([a for a in self.avisos if a["token"] not in self.unlisted | self.hidden])
         if method == "GET" and path.startswith("/requests/"):
             token = path.rsplit("/", 1)[1]
-            return _json([a for a in self.avisos if a["token"] == token])
+            return _json(
+                [a for a in self.avisos if a["token"] == token and token not in self.hidden]
+            )
         if (method, path) == ("GET", "/location-additional-data"):
             hit = self.places.get(query.get("formatted_address", ""))
             return (
@@ -112,13 +127,16 @@ class FakeMadrid:
                     [{"code": self.create_status, "description": "limit"}], self.create_status
                 )
             aviso = self.add(body["address_string"], requested="2026-09-27T03:30:00+00:00")
-            return _json(
-                [{"token": aviso["token"], "service_request_id": aviso["service_request_id"]}]
-            )
+            if self.hide_new:
+                self.hidden.add(aviso["token"])
+            made = {"token": aviso["token"], "service_request_id": aviso["service_request_id"]}
+            return _json([made], self.create_ok_status)
         if m := re.fullmatch(r"/request/(\w+)/reiteration", path):
             aviso = next(a for a in self.avisos if a["token"] == m[1])
             if self.refuse_own_reiteration:
                 return _json([{"code": 400, "description": "own request"}], 400)
+            if self.reiteration_status != 200:
+                return _json([{"code": 0, "description": "down"}], self.reiteration_status)
             aviso["supporting"] = True
             return _json({"ok": True})
         if (method, path) == ("POST", "/requests_comments"):

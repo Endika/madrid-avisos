@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 class Portal(Protocol):
     def profile(self) -> dict[str, object]: ...
     def my_avisos(self) -> list[Aviso]: ...
+    def aviso(self, token: str) -> Aviso: ...
     def locate(self, address: str) -> Place: ...
     def create(
         self, place: Place, *, problem: str, description: str, informant: dict[str, object]
@@ -52,11 +53,16 @@ def save_state(path: Path, state: dict[str, str]) -> None:
 
 
 def _pick(
-    street: str, known: str | None, avisos: list[Aviso], taken: set[str]
+    portal: Portal, street: str, known: str | None, avisos: list[Aviso], taken: set[str]
 ) -> tuple[Aviso | None, Aviso | None]:
     """(open aviso to push, the tracked one if it has closed since)."""
-    by_token = {a.token: a for a in avisos}
-    tracked = by_token.get(known) if known else None
+    tracked = next((a for a in avisos if a.token == known), None) if known else None
+    if known and tracked is None:
+        try:
+            tracked = portal.aviso(known)
+        except PortalError as exc:
+            if exc.status != 404:
+                raise
     if tracked and tracked.is_open:
         return tracked, None
     # Nothing tracked yet, or it closed: adopt my newest open aviso on the same street, if any.
@@ -77,7 +83,8 @@ def _push(portal: Portal, aviso: Aviso, text: str, dry_run: bool) -> tuple[str, 
             portal.reiterate(aviso, text)
             return "reiterated", ""
         except PortalError as exc:
-            if exc.status >= 500 or exc.status == 429:
+            # Only a real refusal (4xx) earns the fallback; a network blip or a 5xx is a failure.
+            if not 400 <= exc.status < 500 or exc.status == 429:
                 raise
             log.info("reiteration refused for %s (%s); commenting instead", aviso.number, exc)
             portal.comment(aviso, text)
@@ -89,11 +96,11 @@ def _push(portal: Portal, aviso: Aviso, text: str, dry_run: bool) -> tuple[str, 
 def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool) -> list[Outcome]:
     avisos = portal.my_avisos()
     informant = portal.profile()
-    taken: set[str] = set()
     outcomes: list[Outcome] = []
     for street in config.streets:
+        taken = {token for other, token in state.items() if other != street}
         try:
-            target, closed = _pick(street, state.get(street), avisos, taken)
+            target, closed = _pick(portal, street, state.get(street), avisos, taken)
             note = f"el anterior #{closed.number} se cerró: {closed.status_name}" if closed else ""
             if target is None:
                 if dry_run:
@@ -109,14 +116,13 @@ def run(portal: Portal, config: Config, state: dict[str, str], *, dry_run: bool)
                 action, extra = "created", ""
             else:
                 action, extra = _push(portal, target, config.followup, dry_run)
-            taken.add(target.token)
             state[street] = target.token
             outcomes.append(
                 Outcome(street, action, target, "; ".join(n for n in (note, extra) if n))
             )
-        except PortalError as exc:
-            log.error("%s: %s", street, exc)
-            outcomes.append(Outcome(street, "failed", None, str(exc)))
+        except Exception as exc:
+            log.exception("%s failed", street)
+            outcomes.append(Outcome(street, "failed", None, str(exc) or type(exc).__name__))
     return outcomes
 
 
