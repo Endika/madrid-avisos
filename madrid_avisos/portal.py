@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import secrets
 import urllib.parse
-from dataclasses import dataclass
 from typing import Any
 
+from .domain import Aviso, Place
 from .http import Response, Transport
 
 API = "https://servpub.madrid.es/AVSICAPI"
@@ -29,38 +29,16 @@ class PortalError(Exception):
         self.status = status
 
 
-@dataclass(frozen=True)
-class Aviso:
-    token: str
-    number: str
-    address: str
-    status_type: str
-    status_name: str
-    requested: str
-
-    @property
-    def is_open(self) -> bool:
-        return not self.status_type.startswith("final")
-
-    @classmethod
-    def from_api(cls, raw: dict[str, Any]) -> Aviso:
-        node = raw.get("status_node") or {}
-        return cls(
-            token=str(raw["token"]),
-            number=str(raw.get("service_request_id", "")),
-            address=str(raw.get("address") or raw.get("address_string") or ""),
-            status_type=str(raw.get("status_node_type") or ""),
-            status_name=str(node.get("visible_name") or node.get("name") or ""),
-            requested=str(raw.get("requested_datetime") or ""),
-        )
-
-
-@dataclass(frozen=True)
-class Place:
-    address: str
-    lat: float
-    lng: float
-    data: tuple[tuple[str, Any], ...]
+def _aviso(raw: dict[str, Any]) -> Aviso:
+    node = raw.get("status_node") or {}
+    return Aviso(
+        token=str(raw["token"]),
+        number=str(raw.get("service_request_id", "")),
+        address=str(raw.get("address") or raw.get("address_string") or ""),
+        status_type=str(raw.get("status_node_type") or ""),
+        status_name=str(node.get("visible_name") or node.get("name") or ""),
+        requested=str(raw.get("requested_datetime") or ""),
+    )
 
 
 def _detail(res: Response) -> str:
@@ -158,14 +136,14 @@ class Portal:
         )
         if not isinstance(raw, list) or not all(isinstance(r, dict) and "token" in r for r in raw):
             raise PortalError("my avisos", 200, "unexpected shape")
-        return [Aviso.from_api(r) for r in raw]
+        return [_aviso(r) for r in raw]
 
     def aviso(self, token: str) -> Aviso:
         raw = self._call("aviso", "GET", f"/requests/{token}")
         found = raw[0] if isinstance(raw, list) and raw else raw
         if not isinstance(found, dict) or "token" not in found:
             raise PortalError("aviso", 404, f"{token} not found")
-        return Aviso.from_api(found)
+        return _aviso(found)
 
     def locate(self, address: str) -> Place:
         raw = self._call(

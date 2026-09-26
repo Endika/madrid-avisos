@@ -18,7 +18,10 @@ dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
 madrid-avisos = "madrid_avisos.cli:main"
 
 [tool.setuptools]
-packages = ["madrid_avisos"]
+packages = [
+    "madrid_avisos",
+    "madrid_avisos.domain",
+]
 
 [tool.ruff]
 line-length = 100

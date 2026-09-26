@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Protocol
 
 from .config import Config
-from .portal import Aviso, Place, PortalError
+from .domain import Aviso, Place
+from .portal import PortalError
 
 log = logging.getLogger(__name__)
 
