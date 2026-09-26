@@ -4,13 +4,12 @@ import argparse
 import logging
 from pathlib import Path
 
-from ..adapters.http import UrllibTransport
+from ..adapters.http import Transport, UrllibTransport
 from ..adapters.notify import Slack
 from ..adapters.portal import PortalClient
 from ..adapters.state import JsonStateFile
 from ..application import Complaint, run_morning
 from ..config import ConfigError, load, read_credentials
-from ..ports import Transport
 
 log = logging.getLogger("madrid_avisos")
 

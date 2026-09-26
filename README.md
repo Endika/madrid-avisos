@@ -97,8 +97,8 @@ Ports and adapters, with the decision kept away from the plumbing:
 
 ```
 domain/       Aviso, Place and the policy: which aviso each street pushes, or a new one
-ports/        Portal, Notifier, StateStore and the HTTP Transport
-adapters/     portal/ (the avisos.madrid.es API), notify/ (Slack), state/ (JSON), http.py
+ports/        Portal, Notifier and StateStore
+adapters/     portal/ (the avisos.madrid.es API), notify/ (Slack), state/ (JSON), http.py (the transport)
 application/  the morning itself, and every word of the summary
 cli/          argparse and the composition root
 ```

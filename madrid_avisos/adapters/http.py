@@ -3,8 +3,24 @@ from __future__ import annotations
 import http.cookiejar
 import urllib.error
 import urllib.request
+from dataclasses import dataclass, field
+from typing import Protocol
 
-from ..ports import Response
+
+@dataclass(frozen=True)
+class Response:
+    status: int
+    body: bytes = b""
+    headers: dict[str, str] = field(default_factory=dict)
+
+    def text(self) -> str:
+        return self.body.decode("utf-8", "replace")
+
+
+class Transport(Protocol):
+    def request(
+        self, method: str, url: str, *, headers: dict[str, str], body: bytes | None = None
+    ) -> Response: ...
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

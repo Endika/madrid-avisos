@@ -1,7 +1,7 @@
 import logging
 
+from madrid_avisos.adapters.http import Response
 from madrid_avisos.adapters.notify.slack import Slack
-from madrid_avisos.ports import Response
 
 from .fakes import FakeMadrid
 

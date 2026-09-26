@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ...domain import Aviso, Place
-from ...ports import Transport
+from ..http import Transport
 from .parsing import aviso_from_api, error_detail, exact_match, login_token, place_from
 
 API = "https://servpub.madrid.es/AVSICAPI"

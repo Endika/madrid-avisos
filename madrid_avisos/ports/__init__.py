@@ -3,26 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
 from typing import Protocol
 
 from ..domain import Aviso, Place
-
-
-@dataclass(frozen=True)
-class Response:
-    status: int
-    body: bytes = b""
-    headers: dict[str, str] = field(default_factory=dict)
-
-    def text(self) -> str:
-        return self.body.decode("utf-8", "replace")
-
-
-class Transport(Protocol):
-    def request(
-        self, method: str, url: str, *, headers: dict[str, str], body: bytes | None = None
-    ) -> Response: ...
 
 
 class Portal(Protocol):

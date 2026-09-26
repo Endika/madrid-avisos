@@ -3,6 +3,7 @@ from email.policy import default
 
 import pytest
 
+from madrid_avisos.adapters.http import Response
 from madrid_avisos.adapters.portal import PortalClient, PortalError
 from madrid_avisos.adapters.portal.client import encode_multipart
 from madrid_avisos.adapters.portal.parsing import (
@@ -12,7 +13,6 @@ from madrid_avisos.adapters.portal.parsing import (
     login_token,
     place_from,
 )
-from madrid_avisos.ports import Response
 
 from .fakes import FakeMadrid
 

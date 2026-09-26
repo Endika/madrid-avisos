@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from ...domain import Aviso, Place
-from ...ports import Response
+from ..http import Response
 
 
 def aviso_from_api(raw: dict[str, Any]) -> Aviso:
