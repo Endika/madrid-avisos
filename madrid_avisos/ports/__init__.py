@@ -1,5 +1,3 @@
-"""The boundaries the morning talks through. Adapters implement them; nothing here does I/O."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -26,9 +24,9 @@ class Portal(Protocol):
 
 
 class StateStore(Protocol):
-    """Which aviso each street is pushing, kept from one morning to the next."""
+    """Which aviso each street is pushing, kept from one run to the next."""
 
     def load(self) -> dict[str, str]: ...
 
-    # Raises OSError when it cannot write; the morning reports it instead of crashing.
+    # Raises OSError when it cannot write; the run reports it instead of crashing.
     def save(self, state: Mapping[str, str]) -> None: ...

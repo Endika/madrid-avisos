@@ -10,7 +10,7 @@ from typing import Any
 
 from ...domain.models import Aviso, Place
 from ..http import Transport
-from .parsing import aviso_from_api, error_detail, exact_match, login_token, place_from
+from .parsing import aviso_from_api, error_detail, exact_match, login_token, place_from_api
 
 API = "https://servpub.madrid.es/AVSICAPI"
 LOGIN = f"{API}/microservice/login-cid360?origin=SIC"
@@ -142,7 +142,7 @@ class PortalClient:
         if hit is None:
             found = [p.get("formatted_address") for p in raw or []]
             raise PortalError(what, 200, f"no single exact match: {found}")
-        return place_from(hit)
+        return place_from_api(hit)
 
     def create(
         self, place: Place, *, problem: str, description: str, informant: Mapping[str, object]

@@ -8,7 +8,7 @@ from ..adapters.http import Transport, UrllibTransport
 from ..adapters.notify.slack import Slack
 from ..adapters.portal.client import PortalClient
 from ..adapters.state.json_file import JsonStateFile
-from ..application.morning import Complaint, run_morning
+from ..application.push import Complaint, run
 from ..config import ConfigError, load, read_credentials
 
 log = logging.getLogger("madrid_avisos")
@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None, transport: Transport | None = None) -> i
         return 2
 
     http = transport or UrllibTransport()
-    text, ok = run_morning(
+    text, ok = run(
         PortalClient(http, email, password),
         JsonStateFile(config.state),
         config.streets,

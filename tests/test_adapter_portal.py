@@ -10,7 +10,7 @@ from madrid_avisos.adapters.portal.parsing import (
     error_detail,
     exact_match,
     login_token,
-    place_from,
+    place_from_api,
 )
 
 from .fakes import FakeMadrid
@@ -69,7 +69,7 @@ def test_the_geocoder_never_guesses(candidates):
 
 
 def test_a_place_keeps_only_the_answers_with_a_value():
-    place = place_from(
+    place = place_from_api(
         {
             **hit(MAYOR),
             "data": [

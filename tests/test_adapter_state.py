@@ -7,7 +7,7 @@ from madrid_avisos.adapters.state.json_file import JsonStateFile
 MAYOR = "Calle Mayor, 26"
 
 
-def test_a_missing_file_is_a_first_morning(tmp_path):
+def test_a_missing_file_is_a_first_run(tmp_path):
     assert JsonStateFile(tmp_path / "state.json").load() == {}
 
 

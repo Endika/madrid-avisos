@@ -43,7 +43,7 @@ def exact_match(address: str, candidates: Iterable[dict[str, Any]] | None) -> di
     return exact[0] if len(exact) == 1 else None
 
 
-def place_from(hit: dict[str, Any]) -> Place:
+def place_from_api(hit: dict[str, Any]) -> Place:
     data = tuple(
         (str(d["question"]["id"]), d["value"])
         for d in hit.get("data", [])

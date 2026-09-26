@@ -1,4 +1,4 @@
-"""One morning: every street gets pushed once, by commenting on its aviso or opening one."""
+"""Each street is pushed once per run: a comment on its aviso, or a new aviso."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class Complaint:
     followup: str
 
 
-def run_morning(
+def run(
     portal: Portal,
     store: StateStore,
     streets: Sequence[str],
