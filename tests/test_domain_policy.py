@@ -1,4 +1,5 @@
-from madrid_avisos.domain import Aviso, policy
+from madrid_avisos.domain import policy
+from madrid_avisos.domain.models import Aviso
 from madrid_avisos.domain.policy import CommentOn, OpenNew
 
 MAYOR = "Calle Mayor, 26"

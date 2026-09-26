@@ -7,7 +7,7 @@ import urllib.parse
 from collections.abc import Iterable
 from typing import Any
 
-from ...domain import Aviso, Place
+from ...domain.models import Aviso, Place
 from ..http import Response
 
 

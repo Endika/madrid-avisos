@@ -1,10 +1,29 @@
-"""Every word the user reads, in Spanish like the portal itself."""
+"""What each street's push came to, and every word the user reads about it."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
+from enum import Enum
 
-from .outcomes import Action, Outcome
+from ..domain.models import Aviso
+
+
+class Action(Enum):
+    CREATED = "created"
+    COMMENTED = "commented"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class Outcome:
+    street: str
+    action: Action
+    aviso: Aviso | None = None
+    closed: Aviso | None = None
+    simulated: bool = False
+    error: str = ""
+
 
 VERBS = {
     Action.CREATED: "aviso nuevo",

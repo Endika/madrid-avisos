@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from madrid_avisos.adapters.state import JsonStateFile
+from madrid_avisos.adapters.state.json_file import JsonStateFile
 
 MAYOR = "Calle Mayor, 26"
 

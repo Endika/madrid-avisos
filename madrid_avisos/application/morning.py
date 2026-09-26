@@ -6,10 +6,10 @@ import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from ..domain import Aviso, policy
+from ..domain import policy
+from ..domain.models import Aviso
 from ..ports import Portal, StateStore
-from .outcomes import Action, Outcome
-from .summary import aborted, summary, unsaved
+from .report import Action, Outcome, aborted, summary, unsaved
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def run_morning(
     try:
         state = store.load()
         portal.login()
-        outcomes = push_streets(portal, streets, complaint, state, dry_run=dry_run)
+        outcomes = _push_streets(portal, streets, complaint, state, dry_run=dry_run)
     except Exception as exc:
         log.exception("run aborted")
         return aborted(str(exc) or type(exc).__name__), False
@@ -48,7 +48,7 @@ def run_morning(
     return text, ok
 
 
-def push_streets(
+def _push_streets(
     portal: Portal,
     streets: Sequence[str],
     complaint: Complaint,

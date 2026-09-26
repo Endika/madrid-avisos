@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from madrid_avisos.cli import main
+from madrid_avisos.cli.main import main
 
 from .fakes import FakeMadrid
 

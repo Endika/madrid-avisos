@@ -5,24 +5,20 @@ import logging
 from pathlib import Path
 
 from ..adapters.http import Transport, UrllibTransport
-from ..adapters.notify import Slack
-from ..adapters.portal import PortalClient
-from ..adapters.state import JsonStateFile
-from ..application import Complaint, run_morning
+from ..adapters.notify.slack import Slack
+from ..adapters.portal.client import PortalClient
+from ..adapters.state.json_file import JsonStateFile
+from ..application.morning import Complaint, run_morning
 from ..config import ConfigError, load, read_credentials
 
 log = logging.getLogger("madrid_avisos")
 
 
-def build_parser() -> argparse.ArgumentParser:
+def main(argv: list[str] | None = None, transport: Transport | None = None) -> int:
     parser = argparse.ArgumentParser(prog="madrid-avisos")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true", help="log in and look, but send nothing")
-    return parser
-
-
-def main(argv: list[str] | None = None, transport: Transport | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     try:

@@ -8,7 +8,7 @@ import urllib.parse
 from collections.abc import Mapping
 from typing import Any
 
-from ...domain import Aviso, Place
+from ...domain.models import Aviso, Place
 from ..http import Transport
 from .parsing import aviso_from_api, error_detail, exact_match, login_token, place_from
 

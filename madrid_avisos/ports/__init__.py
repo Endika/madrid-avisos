@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Protocol
 
-from ..domain import Aviso, Place
+from ..domain.models import Aviso, Place
 
 
 class Portal(Protocol):
