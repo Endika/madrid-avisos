@@ -31,7 +31,8 @@ For each street:
 1. **Its aviso is still open**: it adds a comment to it.
 2. **It has none yet**: it adopts your newest open aviso on the same street, if you already
    filed one by hand. If you haven't, it opens one.
-3. **Its aviso was closed**: it opens a new one, and the summary says how the old one closed.
+3. **Its aviso was closed**: it adopts your newest open aviso on the same street, or opens
+   a new one if there is none. Either way the summary says how the old one closed.
 
 Two addresses never share one aviso. When something fails (login, network, a page that isn't
 JSON), that street shows as `ERROR` in the summary and the rest carry on. Nothing fails
@@ -98,8 +99,8 @@ Ports and adapters, with the decision kept away from the plumbing:
 ```
 domain/       Aviso, Place and the policy: which aviso each street pushes, or a new one
 ports/        Portal and StateStore
-adapters/     portal/ (the avisos.madrid.es API), notify/ (Slack), state/ (JSON), http.py (the transport)
-application/  the morning itself, and every word of the summary
+adapters/     portal/ (avisos.madrid.es), notify/ (Slack), state/ (JSON), http.py
+application/  one run over every street, and every word of the summary
 cli/          argparse and the composition root
 ```
 
