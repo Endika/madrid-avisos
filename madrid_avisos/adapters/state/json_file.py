@@ -22,6 +22,8 @@ class JsonStateFile:
     def save(self, state: Mapping[str, str]) -> None:
         # Written aside and renamed, so a crash halfway never leaves a truncated file.
         tmp = self._path.with_suffix(".tmp")
+        # os.open only applies the mode when it creates the file, so a leftover goes first.
+        tmp.unlink(missing_ok=True)
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as out:
             out.write(json.dumps(dict(state), indent=2, ensure_ascii=False) + "\n")

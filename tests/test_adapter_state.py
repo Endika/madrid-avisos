@@ -60,3 +60,14 @@ def test_the_state_file_is_private(tmp_path):
     JsonStateFile(path).save({"Calle Mayor, 1": "tok1"})
 
     assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_a_leftover_tmp_file_does_not_hand_its_mode_to_the_state(tmp_path):
+    path = tmp_path / "state.json"
+    leftover = tmp_path / "state.tmp"
+    leftover.write_text("{}")
+    leftover.chmod(0o644)
+
+    JsonStateFile(path).save({MAYOR: "t1"})
+
+    assert path.stat().st_mode & 0o777 == 0o600
