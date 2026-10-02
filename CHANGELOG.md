@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/Endika/madrid-avisos/compare/v0.1.0...v0.1.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* use pass in protocol bodies so CodeQL stops flagging them ([a5d0754](https://github.com/Endika/madrid-avisos/commit/a5d0754276b35a00d707882176bd4e6d3d385fae))
+
 ## 0.1.0 (2026-09-26)
 
 
